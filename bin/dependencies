@@ -1,0 +1,44 @@
+#!/usr/bin/env resty
+
+local dependencies = loadfile('dependencies.lua')()
+
+local env = 'production'
+
+local deps = dependencies[env] or {}
+
+local luarocks = {
+    install = function(name, version)
+        local path = require('luarocks.path')
+        local fs = require('luarocks.fs')
+        local build = require("luarocks.build")
+        local repos = require("luarocks.repos")
+        local search = require('luarocks.search')
+
+        path.use_tree(os.getenv('PWD') .. '/lua_modules')
+
+
+        if not repos.is_installed(name, version) then
+            local spec = search.find_suitable_rock(search.make_query(name:lower(), version))
+            assert(fs.check_command_permissions({}))
+            assert(build.build_rock(spec, false, 'none'))
+
+        end
+
+        return true
+    end
+}
+
+local loaders = { luarocks = luarocks }
+
+for name,spec in pairs(deps) do
+    local loader = loaders[spec.loader] or luarocks
+
+    local ok = loader.install(name, spec.version)
+
+
+    if ok then
+        print(name, ': ', spec.version)
+    else
+        print('error installing ', name)
+    end
+end
